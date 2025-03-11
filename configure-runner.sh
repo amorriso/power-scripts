@@ -26,17 +26,22 @@ RUNNER_DIR="/home/github-runner/${REPO_NAME}-actions-runner"
 # 1. Set up the actions-runner folder and download the runner (as github-runner user)
 sudo -u github-runner bash <<EOF
 mkdir -p $RUNNER_DIR && cd $RUNNER_DIR
-curl -o actions-runner-linux-x64-2.320.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.322.0/actions-runner-linux-x64-2.322.0.tar.gz
-tar xzf ./actions-runner-linux-x64-2.320.0.tar.gz
+curl -o actions-runner-linux-x64-2.322.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.322.0/actions-runner-linux-x64-2.322.0.tar.gz
+tar xzf ./actions-runner-linux-x64-2.322.0.tar.gz
 ./config.sh --url $URL --token $TOKEN
 EOF
 
 # 2. Install and configure systemd service using the runner's svc.sh script (run as root)
 sudo bash -c "cd $RUNNER_DIR && ./svc.sh install"
 
+# 2.1 Modify the generated systemd service file to run as github-runner user
+sudo sed -i '/^\[Service\]/a User=github-runner' /etc/systemd/system/actions.runner.${ORG}-${REPO_NAME}.spider.service
+
 # 3. Reload systemd and start the runner service
 SERVICE_NAME="actions.runner.${ORG}-${REPO_NAME}.spider.service"
 sudo systemctl daemon-reload
 sudo systemctl enable $SERVICE_NAME
 sudo systemctl start $SERVICE_NAME
+
+# No functions present in the current script
 
