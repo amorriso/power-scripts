@@ -19,6 +19,8 @@ fi
 
 # Extract repository name from URL
 REPO_NAME=$(basename "$URL")
+# Extract organization name from URL
+ORG=$(echo "$URL" | awk -F'/' '{print $(NF-1)}')
 RUNNER_DIR="/home/github-runner/${REPO_NAME}-actions-runner"
 
 # 1. Set up the actions-runner folder and download the runner (as github-runner user)
@@ -29,23 +31,12 @@ tar xzf ./actions-runner-linux-x64-2.320.0.tar.gz
 ./config.sh --url $URL --token $TOKEN
 EOF
 
-# 2. Configure systemd service
-sudo bash -c "cat <<EOT > /etc/systemd/system/${REPO_NAME}-github-runner.service
-[Unit]
-Description=GitHub Actions Runner for $REPO_NAME
-After=network.target
-
-[Service]
-ExecStart=$RUNNER_DIR/run.sh
-User=github-runner
-WorkingDirectory=$RUNNER_DIR
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOT"
+# 2. Install and configure systemd service using the runner's svc.sh script (run as root)
+sudo bash -c "cd $RUNNER_DIR && ./svc.sh install"
 
 # 3. Reload systemd and start the runner service
+SERVICE_NAME="actions.runner.${ORG}-${REPO_NAME}.spider.service"
 sudo systemctl daemon-reload
-sudo systemctl enable ${REPO_NAME}-github-runner
-sudo systemctl start ${REPO_NAME}-github-runner
+sudo systemctl enable $SERVICE_NAME
+sudo systemctl start $SERVICE_NAME
+
