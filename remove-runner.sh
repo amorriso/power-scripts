@@ -1,6 +1,5 @@
 #!/bin/bash
-# This script manages the deletion of a GitHub Actions runner service.
-# It must be run as the user 'github-runner'.
+# Script to manage the deletion of GitHub Actions runner service
 #
 # Modes:
 #   --list
@@ -8,19 +7,13 @@
 #
 #   --remove [service_file]
 #     Stops, disables, and deletes the specified runner service file.
-#     If no service_file is given and only one matching service is found (pattern: actions.runner.*.spider.service),
-#     it is removed automatically.
+#     If no service_file is given and only one matching service is found (matching the pattern
+#     'actions.runner.*.spider.service'), it is removed automatically.
 #
 # Usage:
 #   ./manage_runner.sh --list
 #   ./manage_runner.sh --remove actions.runner.<ORG>-<REPO>.spider.service
 #   (or simply: ./manage_runner.sh --remove   if exactly one matching file exists)
-
-# Check if the script is being run as github-runner
-if [ "$(whoami)" != "github-runner" ]; then
-    echo "Error: This script can only be run as user 'github-runner'."
-    exit 1
-fi
 
 usage() {
     echo "Usage:"
