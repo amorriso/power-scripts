@@ -35,12 +35,12 @@ tar xzf ./actions-runner-linux-x64-2.322.0.tar.gz
 sudo bash -c "cd \"$RUNNER_DIR\" && ./svc.sh install"
 
 # 2.1 Modify the generated systemd service file to run as github-runner and use the correct WorkingDirectory
-SERVICE_FILE="/etc/systemd/system/actions.runner.${ORG}-${REPO_NAME}.spider.service"
+SERVICE_FILE="/etc/systemd/system/actions.runner.${ORG}-${REPO_NAME}.cactus.service"
 sudo sed -i "s|^WorkingDirectory=.*|WorkingDirectory=${RUNNER_DIR}|" "$SERVICE_FILE"
 sudo sed -i "s|^User=.*|User=github-runner|" "$SERVICE_FILE"
 
 # 3. Reload systemd and start (restart) the runner service
-SERVICE_NAME="actions.runner.${ORG}-${REPO_NAME}.spider.service"
+SERVICE_NAME="actions.runner.${ORG}-${REPO_NAME}.cactus.service"
 sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE_NAME"
 sudo systemctl restart "$SERVICE_NAME"
