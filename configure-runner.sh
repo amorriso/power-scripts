@@ -1,90 +1,46 @@
+cat configure-runner.sh 
 #!/bin/bash
-# This script manages the deletion of a GitHub Actions runner service.
-# It must be run as the user 'github-runner'.
-#
-# Modes:
-#   --list
-#     Lists all service files in /etc/systemd/system that contain "actions" in their name.
-#
-#   --remove [service_file]
-#     Stops, disables, and deletes the specified runner service file.
-#     If no service_file is given and only one matching service is found (pattern: actions.runner.*.spider.service),
-#     it is removed automatically.
-#
-# Usage:
-#   ./manage_runner.sh --list
-#   ./manage_runner.sh --remove actions.runner.<ORG>-<REPO>.spider.service
-#   (or simply: ./manage_runner.sh --remove   if exactly one matching file exists)
 
-# Check if the script is being run as github-runner
-if [ "$(whoami)" != "github-runner" ]; then
-    echo "Error: This script can only be run as user 'github-runner'."
+# Arguments
+URL=""
+TOKEN=""
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --url) URL="$2"; shift ;;
+        --token) TOKEN="$2"; shift ;;
+        *) echo "Unknown parameter: $1"; exit 1 ;;
+    esac
+    shift
+done
+
+if [ -z "$URL" ] || [ -z "$TOKEN" ]; then
+    echo "Both --url and --token must be provided."
     exit 1
 fi
 
-usage() {
-    echo "Usage:"
-    echo "  $0 --list"
-    echo "      List all service files in /etc/systemd/system that contain 'actions' in their name."
-    echo ""
-    echo "  $0 --remove [service_file]"
-    echo "      Remove the specified runner service and clean up."
-    echo "      If service_file is not provided and exactly one matching service is found"
-    echo "      (pattern: actions.runner.*.spider.service), it will be removed automatically."
-    exit 1
-}
+# Extract repository name from URL
+REPO_NAME=$(basename "$URL")
+# Extract organization name from URL
+ORG=$(echo "$URL" | awk -F'/' '{print $(NF-1)}')
+RUNNER_DIR="/home/github-runner/${REPO_NAME}-actions-runner"
 
-if [ "$#" -lt 1 ]; then
-    usage
-fi
+# 1. Set up the actions-runner folder and download the runner (as github-runner user)
+export HOME=/home/github-runner
+mkdir -p "$RUNNER_DIR" && cd "$RUNNER_DIR"
+curl -o actions-runner-linux-x64-2.322.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.322.0/actions-runner-linux-x64-2.322.0.tar.gz
+tar xzf ./actions-runner-linux-x64-2.322.0.tar.gz
+./config.sh --url "$URL" --token "$TOKEN"
 
-if [ "$1" == "--list" ]; then
-    echo "Listing services containing 'actions' in /etc/systemd/system:"
-    sudo ls /etc/systemd/system | grep actions
-    exit 0
+# 2. Install and configure systemd service using the runner's svc.sh script (run as root)
+sudo bash -c "cd \"$RUNNER_DIR\" && ./svc.sh install"
 
-elif [ "$1" == "--remove" ]; then
-    SERVICE_FILE=""
-    if [ "$#" -eq 2 ]; then
-        SERVICE_FILE="$2"
-    else
-        # Attempt to auto-detect a single matching runner service file
-        MATCHES=( $(sudo ls /etc/systemd/system | grep 'actions.runner.*.spider.service') )
-        if [ ${#MATCHES[@]} -eq 0 ]; then
-            echo "No runner service file found matching 'actions.runner.*.spider.service'."
-            exit 1
-        elif [ ${#MATCHES[@]} -eq 1 ]; then
-            SERVICE_FILE="${MATCHES[0]}"
-            echo "Found one runner service: $SERVICE_FILE"
-        else
-            echo "Multiple runner service files found:"
-            for file in "${MATCHES[@]}"; do
-                echo "  $file"
-            done
-            echo "Please specify the service file to remove as a second argument."
-            exit 1
-        fi
-    fi
+# 2.1 Modify the generated systemd service file to run as github-runner and use the correct WorkingDirectory
+SERVICE_FILE="/etc/systemd/system/actions.runner.${ORG}-${REPO_NAME}.spider.service"
+sudo sed -i "s|^WorkingDirectory=.*|WorkingDirectory=${RUNNER_DIR}|" "$SERVICE_FILE"
+sudo sed -i "s|^User=.*|User=github-runner|" "$SERVICE_FILE"
 
-    echo "Stopping service $SERVICE_FILE..."
-    sudo systemctl stop "$SERVICE_FILE"
-    
-    echo "Disabling service $SERVICE_FILE..."
-    sudo systemctl disable "$SERVICE_FILE"
-    
-    echo "Removing service file /etc/systemd/system/$SERVICE_FILE..."
-    sudo rm "/etc/systemd/system/$SERVICE_FILE"
-    
-    echo "Reloading systemd daemon..."
-    sudo systemctl daemon-reload
-    
-    echo "Resetting any failed state..."
-    sudo systemctl reset-failed
-
-    echo "Service $SERVICE_FILE has been removed."
-    exit 0
-
-else
-    usage
-fi
-
+# 3. Reload systemd and start (restart) the runner service
+SERVICE_NAME="actions.runner.${ORG}-${REPO_NAME}.spider.service"
+sudo systemctl daemon-reload
+sudo systemctl enable "$SERVICE_NAME"
+sudo systemctl restart "$SERVICE_NAME"
