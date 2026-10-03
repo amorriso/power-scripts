@@ -27,7 +27,7 @@ RUNNER_DIR="/home/github-runner/${REPO_NAME}-actions-runner"
 # 1. Set up the actions-runner folder and download the runner (as github-runner user)
 export HOME=/home/github-runner
 mkdir -p "$RUNNER_DIR" && cd "$RUNNER_DIR"
-curl -o actions-runner-linux-x64-2.322.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.322.0/actions-runner-linux-x64-2.322.0.tar.gz
+curl -o actions-runner-linux-x64-2.322.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.337.0/actions-runner-linux-x64-2.337.0.tar.gz
 tar xzf ./actions-runner-linux-x64-2.322.0.tar.gz
 ./config.sh --url "$URL" --token "$TOKEN"
 
